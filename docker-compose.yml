@@ -23,7 +23,7 @@ services:
     networks:
       - 28facil-internal
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_PASSWORD:-senha_forte_123}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -52,11 +52,42 @@ services:
     command:
       - -c
       - |
-        docker-php-ext-install pdo pdo_mysql mysqli
-        a2enmod rewrite
-        mkdir -p /var/www/html/public
-        echo '<?php header("Content-Type: application/json"); echo json_encode(["status" => "success", "message" => "28Facil API Server is running!", "timestamp" => date("Y-m-d H:i:s"), "version" => "1.0.0", "php_version" => phpversion(), "database" => ["host" => getenv("DB_HOST"), "database" => getenv("DB_DATABASE"), "status" => "configured"]], JSON_PRETTY_PRINT);' > /var/www/html/public/index.php
-        sed -i 's|/var/www/html|/var/www/html/public|g' /etc/apache2/sites-available/000-default.conf
+        set -e
+        
+        echo "🚀 Instalando extensões PHP..."
+        docker-php-ext-install pdo pdo_mysql mysqli > /dev/null 2>&1
+        
+        echo "🔧 Configurando Apache..."
+        a2enmod rewrite > /dev/null 2>&1
+        
+        # Corrigir DocumentRoot apenas se necessário
+        if ! grep -q "/var/www/html/public" /etc/apache2/sites-available/000-default.conf; then
+          sed -i 's|DocumentRoot /var/www/html|DocumentRoot /var/www/html/public|g' /etc/apache2/sites-available/000-default.conf
+        fi
+        
+        echo "📚 Baixando código da API..."
+        apt-get update -qq > /dev/null 2>&1
+        apt-get install -y -qq git curl > /dev/null 2>&1
+        
+        # Clonar ou atualizar repositório
+        if [ ! -d "/var/www/html/.git" ]; then
+          echo "Clonando repositório..."
+          rm -rf /var/www/html/*
+          git clone -q https://github.com/OARANHA/28facil-api.git /tmp/api
+          cp -r /tmp/api/* /var/www/html/
+          cp -r /tmp/api/.git /var/www/html/
+          rm -rf /tmp/api
+        else
+          echo "Atualizando repositório..."
+          cd /var/www/html
+          git pull -q
+        fi
+        
+        # Permissões
+        chown -R www-data:www-data /var/www/html
+        chmod -R 755 /var/www/html
+        
+        echo "✅ API pronta! Iniciando Apache..."
         apache2-foreground
     
     labels:
