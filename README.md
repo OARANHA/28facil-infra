@@ -1,5 +1,28 @@
 # 🐳 28Facil Infra - Deploy com Docker + Traefik
 
+## ⚡ Instalação Rápida (One-Liner)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/OARANHA/28facil-infra/main/install.sh | bash
+```
+
+**Ou via wget:**
+```bash
+wget -qO- https://raw.githubusercontent.com/OARANHA/28facil-infra/main/install.sh | bash
+```
+
+Este comando vai:
+- ✅ Instalar Docker (se necessário)
+- ✅ Configurar Traefik com SSL automático
+- ✅ Subir API Server + MySQL
+- ✅ Criar banco de dados
+- ✅ Gerar primeira API Key
+- ✅ Testar funcionamento
+
+**Duração:** ~5 minutos
+
+---
+
 ## 🎯 O que este repositório faz?
 
 Infraestrutura completa para deploy do sistema 28Facil:
@@ -8,6 +31,32 @@ Infraestrutura completa para deploy do sistema 28Facil:
 - **Gerenciamento visual** com Portainer
 - **Scripts de deploy** e gerenciamento
 - **Banco de dados** MySQL isolado
+
+---
+
+## 📚 Guias de Instalação
+
+### Opção 1: Automatizada (⭐ Recomendada)
+
+**Instalação completa em um comando:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/OARANHA/28facil-infra/main/install.sh | bash
+```
+
+Veja: [QUICK-START.md](QUICK-START.md)
+
+### Opção 2: Manual (Avançada)
+
+**Clonar e configurar manualmente:**
+```bash
+git clone https://github.com/OARANHA/28facil-infra.git
+cd 28facil-infra
+cp .env.example .env
+nano .env
+./deploy.sh
+```
+
+Veja detalhes na seção [Instalação Manual](#-instalação-manual) abaixo.
 
 ---
 
@@ -27,7 +76,14 @@ api.28facil.com.br (DNS)
 
 ---
 
-## ⚡ Instalação Rápida
+## 🚀 Instalação Manual
+
+### Pré-requisitos
+
+- VPS/Servidor Linux (Ubuntu 20.04+ recomendado)
+- Docker e Docker Compose
+- Domínio apontando para o IP do servidor
+- Portas 80, 443 abertas
 
 ### 1️⃣ Clonar o repositório
 
@@ -52,11 +108,11 @@ DB_PASSWORD=SUA_SENHA_FORTE_AQUI  # 🔒 TROCAR!
 
 APP_ENV=production
 APP_DEBUG=false
-APP_KEY=base64:$(openssl rand -base64 32)  # Gerar
+APP_URL=https://api.28facil.com.br
 
 JWT_SECRET=$(openssl rand -base64 32)  # Gerar
 
-LETSENCRYPT_EMAIL=seu-email@exemplo.com  # 📧 TROCAR!
+ACME_EMAIL=seu-email@exemplo.com  # 📧 TROCAR!
 ```
 
 ### 3️⃣ Configurar DNS
@@ -109,7 +165,7 @@ O script vai:
 
 ### Health Check
 ```bash
-curl https://api.28facil.com.br/
+curl https://api.28facil.com.br/health | jq .
 ```
 
 **Resposta esperada:**
@@ -117,49 +173,61 @@ curl https://api.28facil.com.br/
 {
   "status": "success",
   "message": "28Facil API Server is running!",
-  "timestamp": "2026-01-20 04:00:00",
   "version": "1.0.0",
-  "php_version": "8.2.x"
+  "timestamp": "2026-01-20T04:00:00-03:00",
+  "database": {
+    "status": "connected",
+    "host": "mysql",
+    "database": "28facil_api"
+  }
 }
+```
+
+### Validar API Key
+```bash
+curl -H "X-API-Key: 28fc_sua_key_aqui" \
+     https://api.28facil.com.br/auth/validate | jq .
 ```
 
 ---
 
 ## 🛠️ Gerenciamento
 
-### Ver status
+### Via Makefile (Recomendado)
+
 ```bash
-./manage.sh status
+make help           # Ver todos os comandos
+make status         # Ver status dos containers
+make logs           # Ver logs em tempo real
+make restart        # Reiniciar containers
+make backup         # Backup do banco
+make healthcheck    # Testar API
 ```
 
-### Ver logs
+### Via manage.sh
+
 ```bash
-./manage.sh logs          # Todos
-./manage.sh logs-api      # Apenas API
-./manage.sh logs-mysql    # Apenas MySQL
+./manage.sh status        # Status
+./manage.sh logs          # Logs de todos
+./manage.sh logs-api      # Logs da API
+./manage.sh logs-mysql    # Logs do MySQL
+./manage.sh restart       # Reiniciar todos
+./manage.sh restart-api   # Reiniciar API
+./manage.sh shell         # Shell no container
+./manage.sh mysql         # MySQL CLI
+./manage.sh stats         # Estatísticas
 ```
 
-### Reiniciar
-```bash
-./manage.sh restart       # Todos
-./manage.sh restart-api   # Apenas API
-```
+### Backup do Banco
 
-### Parar/Iniciar
 ```bash
-./manage.sh stop
-./manage.sh start
-```
+# Manual
+./backup.sh
 
-### Entrar nos containers
-```bash
-./manage.sh shell         # API Server
-./manage.sh mysql         # MySQL
-```
+# Ou via make
+make backup
 
-### Estatísticas
-```bash
-./manage.sh stats
+# Backups ficam em: ./backups/
 ```
 
 ---
@@ -199,12 +267,18 @@ docker compose down
 docker compose up -d
 ```
 
+### Rotação de API Keys
+
+Veja: [28facil-api/scripts](https://github.com/OARANHA/28facil-api/tree/main/scripts)
+
 ---
 
-## 📈 Monitoramento
+## 📊 Monitoramento
 
 ### Recursos do sistema
 ```bash
+make stats
+# Ou
 docker stats
 ```
 
@@ -219,6 +293,13 @@ docker system df
 docker system prune -a
 ```
 
+### Healthcheck automático
+```bash
+./healthcheck.sh
+# Ou
+make healthcheck
+```
+
 ---
 
 ## 🐞 Troubleshooting
@@ -227,13 +308,13 @@ docker system prune -a
 
 ```bash
 # Ver logs
-./manage.sh logs-api
+make logs-api
 
 # Verificar se container está rodando
 docker ps | grep api-server
 
 # Reiniciar
-./manage.sh restart-api
+make restart
 ```
 
 ### SSL não funciona
@@ -245,16 +326,16 @@ docker logs traefik
 # Verificar DNS
 dig api.28facil.com.br +short
 
-# Verificar arquivo acme.json
-ls -la traefik/acme.json
-chmod 600 traefik/acme.json
+# Verificar certificados
+ls -la docker/traefik/acme.json
+chmod 600 docker/traefik/acme.json
 ```
 
 ### MySQL não conecta
 
 ```bash
 # Ver logs
-./manage.sh logs-mysql
+make logs-mysql
 
 # Testar conexão
 docker compose exec mysql mysql -u root -p
@@ -269,6 +350,8 @@ cat .env | grep DB_
 
 ```bash
 git pull
+make rebuild
+# Ou
 docker compose down
 docker compose build --no-cache
 docker compose up -d
@@ -284,9 +367,14 @@ docker compose up -d
 ├── traefik-stack.yml          # Stack do Traefik
 ├── .env                        # Configurações (CRIAR!)
 ├── .env.example                # Exemplo de configurações
+├── install.sh                  # Instalador automático
 ├── deploy.sh                   # Script de deploy
 ├── manage.sh                   # Script de gerenciamento
+├── backup.sh                   # Backup do banco
+├── healthcheck.sh              # Healthcheck
 ├── setup-portainer.sh          # Instalar Portainer
+├── Makefile                    # Comandos simplificados
+├── QUICK-START.md              # Guia de deploy rápido
 └── README.md                   # Este arquivo
 ```
 
@@ -295,19 +383,21 @@ docker compose up -d
 ## 🔗 Repositórios Relacionados
 
 - **[28facil-api](https://github.com/OARANHA/28facil-api)**: Código da API REST
-- **[28facil-integrity](https://github.com/OARANHA/28facil-integrity)**: Pacote PHP de monitoramento
+- **[aivopro-integrity](https://github.com/OARANHA/aivopro-integrity)**: Pacote PHP de monitoramento
 
 ---
 
 ## ❓ Suporte
 
 Problemas? Verifique:
-1. Logs: `./manage.sh logs`
-2. Status: `./manage.sh status`
+1. Logs: `make logs` ou `./manage.sh logs`
+2. Status: `make status`
 3. DNS configurado corretamente
 4. Portas 80/443 abertas no firewall
-5. `.env` configurado
+5. `.env` configurado corretamente
+
+Veja também: [QUICK-START.md](QUICK-START.md)
 
 ---
 
-**Feito com ❤️ pela 28Fácil**
+**Desenvolvido com ❤️ pela equipe 28Fácil**
