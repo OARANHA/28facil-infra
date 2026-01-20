@@ -1,0 +1,34 @@
+# Ambiente
+.env
+
+# Docker
+docker/traefik/acme.json
+docker/traefik/logs/*
+!docker/traefik/logs/.gitkeep
+storage/api-logs/*
+!storage/api-logs/.gitkeep
+
+# Dados
+*.sql.gz
+backups/
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Temporários
+tmp/
+temp/
+*.tmp
+*.swp
+*.swo
+*~
+
+# IDE
+.vscode/
+.idea/
+*.iml
